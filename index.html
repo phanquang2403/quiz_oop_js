@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz</title>
+  </head>
+  <style>
+    .container {
+      background-color: aqua;
+      width: 600px;
+      padding: 1rem;
+      margin: 0 auto;
+      border-radius: 0.8rem;
+    }
+    #list {
+      display: flex;
+      overflow: hidden;
+      opacity: 0;
+    }
+    .item {
+      user-select: none;
+      cursor: pointer;
+      padding: 0.2rem 0.5em;
+      border-radius: 0.3rem;
+      border-radius: 0.7;
+      margin: 0 0.3rem;
+      background-color: rgb(112, 211, 108);
+    }
+  </style>
+  <body>
+    <div class="container">
+      <div id="process"></div>
+      <div id="quiz"></div>
+      <div id="score"></div>
+      <div id="countdown"></div>
+      <div id="list"></div>
+      <button id="start" type="button">Start</button>
+    </div>
+    <script src="json.js"></script>
+    <script>
+      function Quiz(params) {
+        this.el = params.el;
+        this.nextEl = params.next;
+        this.scoreEl = params.score;
+        this.processEl = params.process;
+        this.showCountDown = params.countdown;
+        this.time = params.timedown;
+        this.list = params.list;
+        this.start = params.start;
+        this.element = null;
+        this.score = 0;
+        this.step = 0;
+        this.questions = [];
+        this.paganitions = [];
+        this.selected = [];
+        this.init = function () {
+          // Khoi tao element
+          this.element = document.getElementById(this.el);
+          if (!this.element)
+            throw new Error("Element id you provided doesn't exist!");
+          // Load data -> o day chung ta chi load data tu bien quiz
+          // Cung co the load tu server neu ban co cai live server
+          for (let i in quizData) {
+            let question = new Question({
+              id: quizData[i].id,
+              question: quizData[i].question,
+              answers: quizData[i].choices,
+              correct: quizData[i].correct,
+              explanation: quizData[i].explanation,
+              quiz: this, // Ke thua tu Object Quiz
+            });
+            this.questions.push(question);
+            let pagination = new Pagination({
+              id: quizData[i].id,
+            });
+            this.paganitions.push(pagination);
+          }
+          // duyệt trang
+          for (let i in this.paganitions) {
+            this.paganitions[i].renderPagina();
+            var idElement = this.paganitions[i].id;
+          }
+          var listClick = document.querySelectorAll(".item");
+          for (let i = 0; i < listClick.length; i++) {
+            listClick[i].onclick = (e) => {
+              if (!this.selected.includes(i + 1)) {
+                this.next(i);
+              }
+            };
+          }
+          document.getElementById(this.start).addEventListener("click", (e) => {
+            this.autoNext(this.time);
+            this.questions[0].renderQuestion();
+            this.showScore();
+            this.showProcess();
+            document.getElementById(this.list).style.overflow = "visible";
+            document.getElementById(this.list).style.opacity = "1";
+            document.getElementById(this.start).style.display = "none";
+            console.log(this);
+          });
+          var seft = this;
+        };
+        this.init();
+        // document.getElementById(this.nextEl).addEventListener('click',this.next.bind(this)(2));
+      }
+      Quiz.prototype.next = function (step) {
+        this.questions[step].renderQuestion(step);
+        this.showProcess(step);
+      };
+      Quiz.prototype.autoNext = function (limitedTime) {
+        var seft = this;
+        setInterval(() => {
+          if (limitedTime >= 0) {
+            document.getElementById(this.showCountDown).innerHTML = limitedTime;
+            limitedTime--;
+          }
+          if (limitedTime < 0) {
+            this.showScore();
+            document.getElementById(seft.el).innerHTML = "";
+            document.getElementById(seft.processEl).innerHTML = "";
+            document.getElementById(seft.start).style.display = "none";
+            document.getElementById(seft.list).style.display = "none";
+            document.getElementById(seft.showCountDown).style.display = "none";
+          }
+        }, 1000);
+      };
+      Quiz.prototype.showScore = function () {
+        document.getElementById(this.scoreEl).innerHTML =
+          "Your Current Score :" + this.score;
+      };
+      Quiz.prototype.showProcess = function (step) {
+        this.step = step;
+        var a = this.step + 1;
+        document.getElementById(this.processEl).innerHTML =
+          "Current question :" + a + "/" + this.questions.length;
+      };
+      Quiz.prototype.end = function () {
+        alert("Your score :" + this.score);
+      };
+      function Question(params) {
+        this.id = params.id;
+        this.question = params.question;
+        this.answers = params.answers;
+        this.correct = params.correct;
+        this.explanation = params.explanation;
+        this.quiz = params.quiz;
+        this.listChooiceElement = [];
+        this.questionElement = null;
+      }
+      Question.prototype.renderQuestion = function () {
+        let questionNode = document.createElement("DIV");
+        questionNode.className = "quizItem";
+        questionNode.appendChild(document.createTextNode(this.question));
+        let listChooice = document.createElement("UL");
+        var self = this;
+        for (let i in this.answers) {
+          //Build question template
+          let chooiceItem = document.createElement("LI");
+          let chooiceItem_Input = document.createElement("INPUT");
+          chooiceItem_Input.setAttribute("type", "radio");
+          chooiceItem_Input.setAttribute("name", "answer_" + this.id);
+          chooiceItem_Input.setAttribute("value", this.answers[i]);
+          let chooiceItem_Label = document
+            .createElement("LABEL")
+            .appendChild(document.createTextNode(this.answers[i]));
+          chooiceItem.appendChild(chooiceItem_Input);
+          chooiceItem.appendChild(chooiceItem_Label);
+          chooiceItem_Input.addEventListener("change", function (event) {
+            if (self.checkAnswer(this.value)) {
+              self.quiz.score++;
+              self.quiz.showScore();
+            }
+            self.quiz.selected.push(self.id);
+            self.showResult();
+          });
+          // O day anh gan cac HTML DOM object cua cac chooice vao 1 mang va sau nay chung ta de dang xu ly chung
+          this.listChooiceElement.push(chooiceItem);
+          listChooice.appendChild(chooiceItem);
+        }
+        questionNode.appendChild(listChooice);
+        this.questionElement = questionNode;
+        if (this.quiz.element.childNodes.length == 0) {
+          this.quiz.element.appendChild(questionNode);
+        } else {
+          this.quiz.element.replaceChild(
+            questionNode,
+            this.quiz.element.childNodes[0]
+          );
+        }
+      };
+      Question.prototype.checkAnswer = function (answer) {
+        if (answer == this.correct) return true;
+        return false;
+      };
+      Question.prototype.showResult = function () {
+        for (let i in this.listChooiceElement) {
+          if (this.listChooiceElement[i].childNodes[0].value != this.correct) {
+            this.listChooiceElement[i].style.color = "red";
+          } else {
+            this.listChooiceElement[i].style.color = "green";
+          }
+          this.listChooiceElement[i].childNodes[0].setAttribute(
+            "disabled",
+            true
+          );
+        }
+        this.showSuggest();
+      };
+      Question.prototype.showSuggest = function () {
+        let html = document.createElement("SPAN");
+        html.className = "expalantion";
+        html.appendChild(document.createTextNode(this.explanation));
+        this.questionElement.appendChild(html);
+      };
+      function Pagination(params) {
+        this.id = params.id;
+      }
+      Pagination.prototype.renderPagina = function () {
+        // thực hiện render ra các mục phân trang
+        let elementList = document.getElementById("list");
+        let itemElement = document.createElement("DIV");
+        itemElement.setAttribute("class", "item");
+        itemElement.setAttribute("id", `item${this.id}`);
+        itemElement.innerHTML = this.id;
+        elementList.appendChild(itemElement);
+      };
+      var quiz = new Quiz({
+        el: "quiz",
+        next: "next",
+        score: "score",
+        process: "process",
+        countdown: "countdown",
+        list: "list",
+        start: "start",
+        timedown: 20,
+      });
+    </script>
+  </body>
+</html>
